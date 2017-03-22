@@ -8,6 +8,7 @@
 # Context: has a caproto.Broadcaster, a UDP socket, a cache of
 #          search results and a cache of VirtualCircuits.
 #
+import os
 import caproto as ca
 import curio
 from curio import socket
@@ -28,6 +29,7 @@ class VirtualCircuit:
         self.socket = None
 
     async def create_connection(self):
+        print('creating connection to', self.circuit.address)
         self.socket = await socket.create_connection(self.circuit.address)
 
     async def send(self, *commands):
@@ -224,7 +226,9 @@ class Context:
         Process a command and tranport it over the UDP socket.
         """
         bytes_to_send = self.broadcaster.send(*commands)
-        await self.udp_sock.sendto(bytes_to_send, ('', port))
+        hosts = os.environ['EPICS_CA_ADDR_LIST']
+        print('sending to', hosts)
+        await self.udp_sock.sendto(bytes_to_send, (hosts, port))
 
     async def recv(self):
         """
@@ -275,13 +279,17 @@ class Context:
         """
         Create a new channel.
         """
+        print('create_channel')
         address = self.search_results[name]
         circuit = self.get_circuit(address, priority)
         chan = ca.ClientChannel(name, circuit.circuit)
+        print('chan', chan)
 
         async def connect():
             if chan.circuit.states[ca.SERVER] is ca.IDLE:
+                print('about to create_connection')
                 await circuit.create_connection()
+                print('done creating connection')
                 await circuit.send(chan.version())
                 await circuit.send(chan.host_name())
                 await circuit.send(chan.client_name())
@@ -291,6 +299,7 @@ class Context:
         # instance immediately. User can use ``Channel.wait_for_connection()``
         # to wait for connect() to complete.
         await connect()
+        print('return')
         return Channel(circuit, chan)
 
     async def get_event(self):

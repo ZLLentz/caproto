@@ -34,7 +34,7 @@ def test_curio_server():
 
     async def run_server():
         pvdb = ["pi"]
-        ctx = server.Context('0.0.0.0', 5064, pvdb)
+        ctx = server.Context('127.0.0.1', 5066, pvdb)
         await ctx.run()
 
     async def run_client():
@@ -44,14 +44,16 @@ def test_curio_server():
             print("Subscription has received data.")
             called.append(True)
 
-        ctx = client.Context()
+        ctx = client.Context(server_port=5066)
         await ctx.register()
         await ctx.search('pi')
         print('done searching')
         chan1 = await ctx.create_channel('pi')
+        print('create begun')
         chan1.register_user_callback(user_callback)
         # ...and then wait for all the responses.
         await chan1.wait_for_connection()
+        print('connected')
         reading = await chan1.read()
         print('reading:', reading)
         await chan1.subscribe()
@@ -67,6 +69,7 @@ def test_curio_server():
         await chan1.circuit.socket.close()
 
     async def task():
+        os.environ['EPICS_CA_ADDR_LIST'] = '127.0.0.1'
         server_task = await curio.spawn(run_server())
         await curio.sleep(1)  # Give server some time to start up.
         client_task = await run_client()
