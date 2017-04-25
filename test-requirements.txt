@@ -4,4 +4,4 @@ curio
 netifaces
 pyepics
 pytest
-numpy
+numpy==1.11.2
